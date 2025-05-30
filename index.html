@@ -1,36 +1,71 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mirror Cast</title>
+    <title>Mirror Cast - ChromeCast Receiver</title>
+    
+    <!-- Metadatos para ChromeCast -->
+    <meta name="application-name" content="Mirror Cast">
+    <meta name="description" content="Receptor personalizado para screen mirroring con pantallas idle configurables">
+    <meta name="author" content="Mirror Cast">
+    
+    <!-- Configuración de Cast Receiver -->
+    <meta name="cast-application-id" content="499DD855">
+    <meta name="cast-receiver-type" content="custom">
+    <meta name="cast-receiver-version" content="1.0.0">
+    
+    <!-- Iconos para diferentes resoluciones -->
+    <link rel="icon" type="image/png" sizes="32x32" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234285F4'%3E%3Cpath d='M21,3H3A2,2 0 0,0 1,5V17A2,2 0 0,0 3,19H8V17H3V5H21V17H16V19H21A2,2 0 0,0 23,17V5A2,2 0 0,0 21,3M15,17V14H13V17H11L15,21L19,17H17Z'/%3E%3C/svg%3E">
+    
     <style>
-        body {
+        * {
             margin: 0;
             padding: 0;
-            background: #000;
-            color: white;
-            font-family: 'Arial', sans-serif;
-            overflow: hidden;
-            width: 100vw;
-            height: 100vh;
+            box-sizing: border-box;
         }
-        
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .container {
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Contenedor de video principal */
         #video-container {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
+            background: #000;
+            z-index: 10;
         }
-        
+
         #mirror-video {
             width: 100%;
             height: 100%;
             object-fit: contain;
             background: #000;
         }
-        
+
+        /* Contenido idle */
         #idle-content {
             position: absolute;
             top: 0;
@@ -39,70 +74,270 @@
             height: 100%;
             display: flex;
             flex-direction: column;
-            justify-content: center;
             align-items: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            justify-content: center;
+            text-align: center;
+            z-index: 5;
         }
-        
+
         #idle-video {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
+            z-index: 1;
         }
-        
-        .logo {
+
+        .idle-overlay {
+            position: relative;
+            z-index: 2;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .device-info {
+            margin-bottom: 30px;
+        }
+
+        #device-name {
             font-size: 4rem;
             font-weight: bold;
-            margin-bottom: 2rem;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(45deg, #fff, #e0e0e0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
-        
-        .status {
-            font-size: 2rem;
-            margin-bottom: 1rem;
-            opacity: 0.8;
-        }
-        
-        .device-name {
+
+        .subtitle {
             font-size: 1.5rem;
-            opacity: 0.6;
-            margin-top: 1rem;
+            opacity: 0.9;
+            margin-bottom: 20px;
+            color: #e3f2fd;
         }
-        
-        .hidden {
-            display: none !important;
+
+        .status-info {
+            margin-top: 20px;
         }
-        
-        .loading-spinner {
-            border: 4px solid #f3f3f3;
-            border-radius: 50%;
-            border-top: 4px solid #3498db;
+
+        #status {
+            font-size: 1.2rem;
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: inline-block;
+            min-width: 200px;
+        }
+
+        /* Indicador de carga */
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+            text-align: center;
+        }
+
+        .spinner {
             width: 60px;
             height: 60px;
-            animation: spin 2s linear infinite;
-            margin: 2rem;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
         }
-        
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .loading-text {
+            font-size: 1.2rem;
+            color: white;
+        }
+
+        /* Icono ChromeCast */
+        .cast-icon {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            opacity: 0.6;
+            z-index: 3;
+        }
+
+        .cast-icon svg {
+            width: 100%;
+            height: 100%;
+            fill: white;
+            filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.3));
+        }
+
+        /* Información de conectividad */
+        .connectivity-info {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            z-index: 3;
+            backdrop-filter: blur(5px);
+        }
+
+        .connectivity-info .label {
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .connectivity-info .value {
+            font-weight: bold;
+        }
+
+        /* Animaciones */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            #device-name {
+                font-size: 2.5rem;
+            }
+            
+            .subtitle {
+                font-size: 1.2rem;
+            }
+            
+            .idle-overlay {
+                padding: 20px;
+                margin: 20px;
+            }
+        }
+
+        /* Efectos especiales para diferentes tipos de background */
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Overlay para video background */
+        .video-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                135deg,
+                rgba(102, 126, 234, 0.6) 0%,
+                rgba(118, 75, 162, 0.6) 50%,
+                rgba(240, 147, 251, 0.6) 100%
+            );
+            z-index: 1;
+        }
+
+        /* Indicador de mirroring activo */
+        .mirror-indicator {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            background: #f44336;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            z-index: 15;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
     </style>
 </head>
 <body>
-    <div id="video-container" class="hidden">
-        <video id="mirror-video" autoplay muted></video>
-    </div>
-    
-    <div id="idle-content">
-        <div class="logo">Mirror Cast</div>
-        <div class="status">Listo para conectar</div>
-        <div class="loading-spinner hidden" id="loading"></div>
-        <div class="device-name" id="device-name">Chromecast</div>
-        <video id="idle-video" class="hidden" autoplay muted loop></video>
+    <div class="container">
+        <!-- Contenedor de video para mirroring -->
+        <div id="video-container" class="hidden">
+            <video id="mirror-video" autoplay muted playsinline></video>
+            <div class="mirror-indicator">
+                🔴 EN VIVO
+            </div>
+        </div>
+
+        <!-- Contenido idle -->
+        <div id="idle-content" class="fade-in">
+            <!-- Video de fondo idle (opcional) -->
+            <video id="idle-video" class="hidden" autoplay muted loop playsinline></video>
+            
+            <!-- Overlay para video background -->
+            <div class="video-overlay"></div>
+            
+            <!-- Contenido principal -->
+            <div class="idle-overlay">
+                <div class="device-info">
+                    <h1 id="device-name">Mirror Cast</h1>
+                    <p class="subtitle">Listo para transmitir tu pantalla</p>
+                </div>
+                
+                <div class="status-info">
+                    <div id="status">Esperando conexión...</div>
+                </div>
+            </div>
+            
+            <!-- Información de conectividad -->
+            <div class="connectivity-info">
+                <div class="label">Application ID:</div>
+                <div class="value">499DD855</div>
+                <div class="label" style="margin-top: 10px;">Receiver Version:</div>
+                <div class="value">1.0.0</div>
+            </div>
+            
+            <!-- Icono ChromeCast -->
+            <div class="cast-icon">
+                <svg viewBox="0 0 24 24">
+                    <path d="M21,3H3A2,2 0 0,0 1,5V17A2,2 0 0,0 3,19H8V17H3V5H21V17H16V19H21A2,2 0 0,0 23,17V5A2,2 0 0,0 21,3M15,17V14H13V17H11L15,21L19,17H17Z"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Indicador de carga -->
+        <div id="loading" class="hidden">
+            <div class="spinner"></div>
+            <div class="loading-text">Conectando...</div>
+        </div>
     </div>
 
-    <script type="text/javascript" src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+    <!-- Cast Receiver Framework -->
+    <script type="text/javascript" src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+    
+    <!-- Receiver JavaScript -->
     <script src="receiver.js"></script>
 </body>
 </html> 
