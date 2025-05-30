@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mirror Cast - Conectar</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #fff, #e0e0e0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 1rem;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+
+        .cast-button {
+            width: 100%;
+            background: #4285F4;
+            color: white;
+            border: none;
+            padding: 18px;
+            font-size: 1.2rem;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-weight: bold;
+        }
+
+        .cast-button:hover {
+            background: #3367d6;
+            transform: translateY(-2px);
+        }
+
+        .cast-button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-weight: bold;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.connecting {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid #ffc107;
+            color: #ffc107;
+        }
+
+        .status.connected {
+            background: rgba(40, 167, 69, 0.2);
+            border: 1px solid #28a745;
+            color: #28a745;
+        }
+
+        .status.error {
+            background: rgba(220, 53, 69, 0.2);
+            border: 1px solid #dc3545;
+            color: #dc3545;
+        }
+
+        .device-info {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            display: none;
+        }
+
+        .device-info.show {
+            display: block;
+        }
+
+        .device-info strong {
+            color: #4285F4;
+        }
+
+        .instructions {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: left;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .instructions h3 {
+            color: #4285F4;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .instructions ol {
+            margin-left: 15px;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+        }
+
+        .cast-icon {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+
+        .app-info {
+            margin-top: 20px;
+            font-size: 0.8rem;
+            opacity: 0.7;
+            text-align: center;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Estilos para cuando está conectado */
+        .connected-state {
+            background: rgba(40, 167, 69, 0.1);
+            border: 2px solid #28a745;
+        }
+
+        .mirror-now-button {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="main-container">
+        <h1>📱 Mirror Cast</h1>
+        <p class="subtitle">Conecta tu ChromeCast para screen mirroring personalizado</p>
+        
+        <button class="cast-button" id="cast-button" onclick="connectToCast()">
+            <svg class="cast-icon" viewBox="0 0 24 24">
+                <path d="M21,3H3A2,2 0 0,0 1,5V17A2,2 0 0,0 3,19H8V17H3V5H21V17H16V19H21A2,2 0 0,0 23,17V5A2,2 0 0,0 21,3M15,17V14H13V17H11L15,21L19,17H17Z"/>
+            </svg>
+            Conectar ChromeCast
+        </button>
+
+        <div class="status" id="status"></div>
+
+        <div class="device-info" id="device-info">
+            <strong>✅ Conectado a:</strong>
+            <div id="device-name" style="margin-top: 5px; font-size: 1.1em;"></div>
+            <div id="device-status" style="margin-top: 5px; opacity: 0.8;"></div>
+        </div>
+
+        <div class="instructions">
+            <h3>🎯 Cómo usar:</h3>
+            <ol>
+                <li><strong>Conecta:</strong> Toca "Conectar ChromeCast" arriba</li>
+                <li><strong>Abre screen mirroring:</strong> Configuración → Dispositivos conectados → Transmitir</li>
+                <li><strong>Selecciona tu ChromeCast:</strong> Aparecerá en la lista</li>
+                <li><strong>¡Disfruta!</strong> Usará tu receiver personalizado Mirror Cast</li>
+            </ol>
+        </div>
+
+        <div class="app-info">
+            Application ID: 499DD855 | Version: 1.0.0
+        </div>
+    </div>
+
+    <!-- ChromeCast SDK -->
+    <script type="text/javascript" src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+    
+    <script>
+        let castSession = null;
+        let isConnected = false;
+        let keepAliveInterval = null;
+
+        // Inicializar ChromeCast
+        window['__onGCastApiAvailable'] = function(isAvailable) {
+            if (isAvailable) {
+                initializeCastApi();
+            } else {
+                showStatus('ChromeCast no disponible en este navegador', 'error');
+            }
+        };
+
+        function initializeCastApi() {
+            try {
+                const context = cast.framework.CastContext.getInstance();
+                
+                context.setOptions({
+                    receiverApplicationId: '499DD855',
+                    autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+                });
+
+                context.addEventListener(
+                    cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
+                    onSessionStateChanged
+                );
+
+                console.log('✅ ChromeCast API inicializada');
+                
+                // Verificar sesión existente
+                const session = context.getCurrentSession();
+                if (session) {
+                    onSessionStarted(session);
+                }
+            } catch (error) {
+                console.error('❌ Error inicializando Cast API:', error);
+                showStatus('Error inicializando ChromeCast', 'error');
+            }
+        }
+
+        function connectToCast() {
+            const button = document.getElementById('cast-button');
+            button.disabled = true;
+            button.innerHTML = '<div class="spinner"></div>Buscando dispositivos...';
+            
+            showStatus('Buscando dispositivos ChromeCast...', 'connecting');
+
+            try {
+                const context = cast.framework.CastContext.getInstance();
+                context.requestSession().then(
+                    function(session) {
+                        console.log('✅ Conectado exitosamente');
+                    },
+                    function(error) {
+                        console.error('❌ Error conectando:', error);
+                        showStatus('Error: ' + (error.description || error.message), 'error');
+                        resetButton();
+                    }
+                );
+            } catch (error) {
+                console.error('❌ Error en connectToCast:', error);
+                showStatus('Error: ' + error.message, 'error');
+                resetButton();
+            }
+        }
+
+        function disconnect() {
+            try {
+                const context = cast.framework.CastContext.getInstance();
+                const session = context.getCurrentSession();
+                if (session) {
+                    session.endSession(true);
+                }
+            } catch (error) {
+                console.error('❌ Error desconectando:', error);
+            }
+        }
+
+        function onSessionStateChanged(event) {
+            switch (event.sessionState) {
+                case cast.framework.SessionState.SESSION_STARTED:
+                    onSessionStarted(event.session);
+                    break;
+                case cast.framework.SessionState.SESSION_ENDED:
+                    onSessionEnded();
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        function onSessionStarted(session) {
+            console.log('🎯 Sesión iniciada');
+            castSession = session;
+            isConnected = true;
+
+            const deviceName = session.getCastDevice().friendlyName;
+            showStatus('✅ Conectado a ' + deviceName, 'connected');
+            
+            // Actualizar UI
+            document.getElementById('device-name').textContent = deviceName;
+            document.getElementById('device-status').textContent = 'Mirror Cast activo y listo';
+            document.getElementById('device-info').classList.add('show');
+            document.getElementById('main-container').classList.add('connected-state');
+            
+            // Actualizar botón
+            const button = document.getElementById('cast-button');
+            button.innerHTML = '🔌 Desconectar';
+            button.onclick = disconnect;
+            button.disabled = false;
+            button.classList.add('mirror-now-button');
+            
+            // Iniciar keep-alive
+            startKeepAlive();
+            
+            // Enviar configuración
+            setTimeout(sendInitialConfig, 1000);
+        }
+
+        function onSessionEnded() {
+            console.log('❌ Sesión terminada');
+            castSession = null;
+            isConnected = false;
+
+            showStatus('Desconectado', 'error');
+            document.getElementById('device-info').classList.remove('show');
+            document.getElementById('main-container').classList.remove('connected-state');
+            
+            // Detener keep-alive
+            if (keepAliveInterval) {
+                clearInterval(keepAliveInterval);
+                keepAliveInterval = null;
+            }
+            
+            resetButton();
+        }
+
+        function resetButton() {
+            const button = document.getElementById('cast-button');
+            button.innerHTML = `
+                <svg class="cast-icon" viewBox="0 0 24 24">
+                    <path d="M21,3H3A2,2 0 0,0 1,5V17A2,2 0 0,0 3,19H8V17H3V5H21V17H16V19H21A2,2 0 0,0 23,17V5A2,2 0 0,0 21,3M15,17V14H13V17H11L15,21L19,17H17Z"/>
+                </svg>
+                Conectar ChromeCast
+            `;
+            button.onclick = connectToCast;
+            button.disabled = false;
+            button.classList.remove('mirror-now-button');
+        }
+
+        function startKeepAlive() {
+            if (keepAliveInterval) return;
+            
+            keepAliveInterval = setInterval(() => {
+                if (isConnected && castSession) {
+                    const ping = {
+                        action: 'ping',
+                        timestamp: Date.now()
+                    };
+                    
+                    castSession.sendMessage('urn:x-cast:com.mirrorcast.control', JSON.stringify(ping))
+                        .catch(error => console.error('❌ Error en ping:', error));
+                }
+            }, 30000);
+        }
+
+        function sendInitialConfig() {
+            if (!castSession) return;
+
+            const config = {
+                deviceName: 'Mirror Cast',
+                backgroundType: 'gradient'
+            };
+
+            castSession.sendMessage('urn:x-cast:com.mirrorcast.config', JSON.stringify(config))
+                .then(() => console.log('⚙️ Configuración enviada'))
+                .catch(error => console.error('❌ Error config:', error));
+        }
+
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = 'status show ' + type;
+            
+            // Auto-hide después de 5 segundos si no es error
+            if (type !== 'error' && type !== 'connected') {
+                setTimeout(() => {
+                    statusEl.classList.remove('show');
+                }, 5000);
+            }
+        }
+
+        // Prevenir zoom en iOS
+        document.addEventListener('touchstart', function(event) {
+            if (event.touches.length > 1) {
+                event.preventDefault();
+            }
+        });
+
+        // Mantener pantalla activa
+        if ('wakeLock' in navigator) {
+            let wakeLock = null;
+            
+            async function requestWakeLock() {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('🔋 Wake lock activado');
+                } catch (err) {
+                    console.log('❌ No se pudo activar wake lock:', err);
+                }
+            }
+            
+            // Activar cuando se conecte
+            document.addEventListener('visibilitychange', () => {
+                if (isConnected && !document.hidden) {
+                    requestWakeLock();
+                }
+            });
+        }
+    </script>
+</body>
+</html> 
