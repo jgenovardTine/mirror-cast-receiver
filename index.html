@@ -180,5 +180,222 @@
     
     <!-- Custom receiver script -->
     <script src="receiver.js"></script>
+
+    <!-- Soporte Miracast Nativo -->
+    <script>
+    class MiracastNativeReceiver {
+        constructor() {
+            this.isActive = false;
+            this.peerConnection = null;
+            this.connectionState = 'disconnected';
+            this.localStream = null; // Para almacenar el stream y detenerlo
+            console.log('MiracastNativeReceiver: constructor');
+            // No llamar a init() aquí directamente, se activará externamente o por un evento
+        }
+        
+        init() {
+            if (this.isActive) {
+                console.log('MiracastNativeReceiver: Ya inicializado.');
+                return;
+            }
+            console.log('MiracastNativeReceiver: Iniciando soporte Miracast nativo para Xiaomi...');
+            this.setupWebRTC();
+            this.startMiracastService();
+            this.isActive = true;
+        }
+        
+        setupWebRTC() {
+            console.log('MiracastNativeReceiver: Configurando WebRTC...');
+            const config = {
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            };
+            
+            this.peerConnection = new RTCPeerConnection(config);
+            
+            this.peerConnection.ontrack = (event) => {
+                console.log('MiracastNativeReceiver: Stream Miracast recibido de Xiaomi');
+                this.localStream = event.streams[0];
+                this.handleXiaomiStream(this.localStream);
+            };
+            
+            this.peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log('MiracastNativeReceiver: Enviando ICE candidate...');
+                    // Enviar candidate al cliente Xiaomi (simulado via localStorage)
+                    localStorage.setItem('miracast_receiver_candidate', JSON.stringify({ type: 'candidate', candidate: event.candidate }));
+                }
+            };
+            
+            this.peerConnection.onconnectionstatechange = () => {
+                this.connectionState = this.peerConnection.connectionState;
+                console.log('MiracastNativeReceiver: Estado conexión Miracast:', this.connectionState);
+                
+                if (this.connectionState === 'connected') {
+                    this.onXiaomiConnected();
+                } else if (this.connectionState === 'disconnected' || this.connectionState === 'failed' || this.connectionState === 'closed') {
+                    this.onXiaomiDisconnected();
+                }
+            };
+            console.log('MiracastNativeReceiver: WebRTC configurado.');
+        }
+        
+        startMiracastService() {
+            console.log('MiracastNativeReceiver: Iniciando servicio Miracast...');
+            this.announceMiracastService();
+            this.listenForXiaomiDevices(); // Escucha ofertas SDP de Xiaomi
+            console.log('MiracastNativeReceiver: Servicio Miracast activo para Xiaomi.');
+        }
+        
+        announceMiracastService() {
+            // Simular anuncio mDNS para que un cliente hipotético lo descubra
+            const serviceInfo = {
+                name: 'Mirror Cast Receiver (Miracast)',
+                type: '_miracast._tcp.local',
+                port: 7236, // Puerto estándar Miracast
+                deviceName: 'ChromeCast Mirror Cast'
+            };
+            
+            // Para testing, podemos poner esto en localStorage para que otra pestaña lo vea
+            localStorage.setItem('miracast_service_info', JSON.stringify(serviceInfo));
+            console.log('MiracastNativeReceiver: Servicio Miracast anunciado (simulado):', serviceInfo);
+            
+            // Beacon simulado
+            setInterval(() => {
+                if (this.isActive) {
+                    localStorage.setItem('miracast_beacon', JSON.stringify({
+                        deviceName: 'ChromeCast Mirror Cast',
+                        status: this.connectionState,
+                        timestamp: Date.now()
+                    }));
+                }
+            }, 5000);
+        }
+        
+        listenForXiaomiDevices() {
+            console.log('MiracastNativeReceiver: Escuchando solicitudes de conexión Miracast de Xiaomi (via localStorage)...');
+            window.addEventListener('storage', (event) => {
+                if (event.key === 'xiaomi_miracast_offer') {
+                    const offerData = JSON.parse(event.newValue);
+                    if (offerData && offerData.type === 'offer') {
+                        console.log('MiracastNativeReceiver: Oferta SDP recibida de Xiaomi.');
+                        this.handleXiaomiConnection(offerData.sdp);
+                    }
+                }
+                 if (event.key === 'xiaomi_miracast_candidate') {
+                    const candidateData = JSON.parse(event.newValue);
+                    if (candidateData && candidateData.type === 'candidate') {
+                        console.log('MiracastNativeReceiver: ICE candidate recibido de Xiaomi.');
+                        this.peerConnection.addIceCandidate(new RTCIceCandidate(candidateData.candidate));
+                    }
+                }
+            });
+        }
+        
+        async handleXiaomiConnection(sdpOffer) {
+            if (!this.peerConnection || this.peerConnection.signalingState !== 'stable') {
+                console.warn('MiracastNativeReceiver: PeerConnection no está en estado estable para aceptar oferta. Estado actual:', this.peerConnection ? this.peerConnection.signalingState : 'null');
+                // Podríamos necesitar reiniciar la conexión WebRTC aquí si está en un mal estado.
+                // this.setupWebRTC(); // Ojo con esto, podría causar bucles si no se maneja bien.
+                // return;
+            }
+            console.log('MiracastNativeReceiver: Procesando oferta SDP de Xiaomi...');
+            try {
+                await this.peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: sdpOffer }));
+                
+                console.log('MiracastNativeReceiver: Creando respuesta SDP...');
+                const answer = await this.peerConnection.createAnswer();
+                await this.peerConnection.setLocalDescription(answer);
+                
+                // Enviar la respuesta SDP al cliente Xiaomi (simulado via localStorage)
+                localStorage.setItem('miracast_receiver_answer', JSON.stringify({ type: 'answer', sdp: answer.sdp }));
+                console.log('MiracastNativeReceiver: Respuesta SDP enviada a Xiaomi.');
+                
+            } catch (error) {
+                console.error('MiracastNativeReceiver: Error manejando conexión Miracast con Xiaomi:', error);
+            }
+        }
+        
+        handleXiaomiStream(stream) {
+            console.log('MiracastNativeReceiver: Mostrando stream de Xiaomi...');
+            const videoElement = document.getElementById('mirror-video');
+            if (videoElement) {
+                videoElement.srcObject = stream;
+                videoElement.play().catch(e => console.error('Error al reproducir video:', e));
+                this.showVideoDisplay();
+            } else {
+                console.error('MiracastNativeReceiver: Elemento de video #mirror-video no encontrado.');
+            }
+        }
+        
+        showVideoDisplay() {
+            const idleContent = document.getElementById('idle-content');
+            const videoContainer = document.getElementById('video-container');
+            if (idleContent) idleContent.classList.add('hidden');
+            if (videoContainer) videoContainer.classList.remove('hidden');
+            console.log('MiracastNativeReceiver: Mostrando contenedor de video.');
+        }
+        
+        hideVideoDisplay() {
+            const idleContent = document.getElementById('idle-content');
+            const videoContainer = document.getElementById('video-container');
+            if (idleContent) idleContent.classList.remove('hidden');
+            if (videoContainer) videoContainer.classList.add('hidden');
+            console.log('MiracastNativeReceiver: Ocultando contenedor de video.');
+        }
+        
+        onXiaomiConnected() {
+            console.log('MiracastNativeReceiver: Xiaomi conectado via Miracast (WebRTC).');
+            const statusEl = document.getElementById('status');
+            if (statusEl) statusEl.textContent = 'Xiaomi conectado - Miracast Nativo (WebRTC)';
+        }
+        
+        onXiaomiDisconnected() {
+            console.log('MiracastNativeReceiver: Xiaomi desconectado.');
+            this.hideVideoDisplay();
+            if (this.localStream) {
+                this.localStream.getTracks().forEach(track => track.stop());
+                this.localStream = null;
+            }
+            // No reiniciar setupWebRTC() aquí automáticamente para evitar bucles.
+            // La reconexión debería ser iniciada por el cliente.
+            const statusEl = document.getElementById('status');
+            if (statusEl) statusEl.textContent = 'Receptor activo y listo';
+        }
+
+        // Método para activar/desactivar el receptor Miracast si es necesario
+        activate() {
+            if (!this.isActive) {
+                this.init();
+            } else {
+                 console.log('MiracastNativeReceiver: Ya está activo.');
+            }
+        }
+
+        deactivate() {
+            if (this.isActive) {
+                if (this.peerConnection) {
+                    this.peerConnection.close();
+                    this.peerConnection = null; // Limpiar para una posible reactivación
+                }
+                if (this.localStream) {
+                    this.localStream.getTracks().forEach(track => track.stop());
+                    this.localStream = null;
+                }
+                this.isActive = false;
+                this.connectionState = 'disconnected';
+                console.log('MiracastNativeReceiver: Desactivado.');
+                this.hideVideoDisplay();
+                 const statusEl = document.getElementById('status');
+                if (statusEl) statusEl.textContent = 'Receptor activo y listo (Miracast Desactivado)';
+            }
+        }
+    }
+
+    // Inicializar y adjuntar al objeto window para que sea accesible desde receiver.js
+    // Se inicializará explícitamente desde receiver.js cuando sea apropiado.
+    window.miracastNativeManager = new MiracastNativeReceiver();
+    console.log('MiracastNativeReceiver: Cargado y listo para ser activado.');
+
+    </script>
 </body>
 </html> 
